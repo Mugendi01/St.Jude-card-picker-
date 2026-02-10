@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ST Rita Chama Picker</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+body {
+  margin:0;
+  font-family:'Poppins',sans-serif;
+  background: linear-gradient(135deg,#6CA651,#BBCB2E);
+  text-align:center;
+  color:#333;
+}
+h1{
+  margin:20px 0 5px 0;
+  font-size:24px;
+  color:#839705;
+}
+.info{
+  font-size:14px;
+  opacity:0.7;
+  margin-bottom:15px;
+}
+.form-container{
+  margin:20px auto;
+  max-width:300px;
+  text-align:center;
+}
+input{
+  padding:10px;
+  width:100%;
+  max-width:260px;
+  font-size:16px;
+  border-radius:15px;
+  border:1px solid #6B7445;
+  margin-bottom:10px;
+  box-sizing: border-box;
+}
+button{
+  padding:10px 20px;
+  font-size:16px;
+  border:none;
+  border-radius:15px;
+  background: #839705;
+  color:#fff;
+  cursor:pointer;
+  transition:0.3s;
+}
+button:hover{
+  background:#6B7445;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
+  gap:15px;
+  width:90%;
+  max-width:420px;
+  margin:20px auto;
+}
+.card{
+  aspect-ratio:1/1;
+  border-radius:25px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-weight:600;
+  font-size:18px;
+  text-align:center;
+  cursor:pointer;
+  background: linear-gradient(145deg,#CDE2A2,#D7F083);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  transition:0.3s;
+  position: relative;
+  padding:5px;
+  color:#6B7445;
+}
+.card:hover{
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+.card.revealed{
+  background: #BBCB2E;
+  color:#6CA651;
+  font-size:20px;
+  cursor:default;
+}
+canvas{
+  position:fixed;
+  pointer-events:none;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+}
+.thank-you{
+  margin-top:20px;
+  font-size:16px;
+  color:#6B7445;
+  opacity:0.85;
+  word-wrap: break-word;
+}
+
+/* Responsive */
+@media (max-width:480px){
+  h1{ font-size:20px; }
+  .card{ font-size:16px; border-radius:20px; }
+  button{ font-size:14px; padding:8px 16px; }
+  .thank-you{ font-size:14px; }
+  input{ font-size:14px; padding:8px; }
+}
+</style>
+</head>
+<body>
+
+<h1> St Jude Chama</h1>
+<div class="info">Enter your name before picking a card</div>
+
+<div class="form-container" id="formContainer">
+  <input type="text" id="nameInput" placeholder="Your Name"/>
+  <button id="startBtn">Start Picking</button>
+</div>
+
+<!-- Reset button container (hidden for non-admins) -->
+<div id="resetContainer" style="display:none;">
+  <button id="resetBtn">Reset All Cards</button>
+</div>
+
+<div class="grid" id="grid" style="display:none;"></div>
+<div class="thank-you" id="thankYou"></div>
+
+<canvas id="confetti"></canvas>
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyBDv6BufDNDIeozkX5U6ONVofeOWEp1xHo",
+  authDomain: "st-ritachama.firebaseapp.com",
+  databaseURL: "https://st-ritachama-default-rtdb.firebaseio.com",
+  projectId: "st-ritachama",
+  storageBucket: "st-ritachama.firebasestorage.app",
+  messagingSenderId: "661955811760",
+  appId: "1:661955811760:web:e440ef4f0fe59b4e73de75",
+  measurementId: "G-1HE9J8RNY4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let TOTAL = 18;
+let userName = '';
+let hasPicked = false;
+const grid = document.getElementById('grid');
+const thankYou = document.getElementById('thankYou');
+const formContainer = document.getElementById('formContainer');
+const nameInput = document.getElementById('nameInput');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const resetContainer = document.getElementById('resetContainer');
+
+startBtn.onclick = ()=>{
+  const name = nameInput.value.trim();
+  if(!name){ alert('Please enter your name.'); return; }
+  userName = name;
+  formContainer.style.display = 'none';
+  grid.style.display = 'grid';
+
+  // Show reset button only for Mary Wanjiku
+  if(userName.toLowerCase() === 'mary wanjiku'){
+    resetContainer.style.display = 'block';
+  } else {
+    resetContainer.style.display = 'none';
+  }
+
+  checkUserPick();
+  render();
+}
+
+function checkUserPick(){
+  db.ref('picks').once('value').then(snapshot=>{
+    const data = snapshot.val() || {};
+    hasPicked = Object.values(data).some(p=>p.name.toLowerCase() === userName.toLowerCase());
+    if(hasPicked){
+      thankYou.innerText = `Hello ${userName}, you have already picked a card.`;
+    }
+  });
+}
+
+function render(){
+  grid.innerHTML = '';
+  for(let i=1;i<=TOTAL;i++){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerText = 'Pick Me';
+    card.dataset.cardId = i;
+    card.onclick = ()=>pickCard(i, card);
+    grid.appendChild(card);
+  }
+  loadPicks();
+}
+
+function loadPicks(){
+  db.ref('picks').on('value', snapshot=>{
+    const data = snapshot.val() || {};
+    for(let i=1;i<=TOTAL;i++){
+      const card = grid.children[i-1];
+      if(data[i]){
+        card.classList.add('revealed');
+        card.innerText = `Position\n${data[i].position}\n(${data[i].name})`;
+      } else if(!card.classList.contains('revealed')){
+        card.innerText = 'Pick Me';
+      }
+    }
+  });
+}
+
+function pickCard(i, card){
+  if(card.classList.contains('revealed') || hasPicked){
+    alert('You have already picked a card.');
+    return;
+  }
+
+  db.ref('picks').once('value').then(snapshot=>{
+    const data = snapshot.val() || {};
+    const remaining = Array.from({length: TOTAL}, (_, k)=>k+1)
+      .filter(n=>!Object.values(data).some(p=>p.position===n));
+    if(remaining.length===0){ alert('All cards are picked.'); return; }
+
+    const pos = remaining[Math.floor(Math.random()*remaining.length)];
+    db.ref('picks/'+i).set({name:userName, position:pos});
+    hasPicked = true;
+    card.classList.add('revealed');
+    card.innerText = `Position\n${pos}\n(${userName})`;
+    thankYou.innerText = `Thank you, ${userName}, for picking a card!`;
+    launchConfetti();
+  });
+}
+
+// Reset logic (only visible to Mary Wanjiku)
+resetBtn.onclick = ()=>{
+  if(confirm("Are you sure you want to reset all picks? This cannot be undone.")){
+    db.ref('picks').remove().then(()=>{
+      hasPicked = false;
+      thankYou.innerText = '';
+      render();
+    }).catch(err=>{ alert("Error resetting: "+err.message); });
+  }
+};
+
+/* Top-falling Confetti */
+const canvas = document.getElementById('confetti');
+const ctx = canvas.getContext('2d');
+
+function launchConfetti(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const pieces = [];
+  for(let i=0;i<150;i++){
+    pieces.push({
+      x: Math.random()*canvas.width,
+      y: Math.random()*-canvas.height,
+      r: Math.random()*6+2,
+      d: Math.random()*4+2,
+      color: `hsl(${Math.random()*360},80%,70%)`
+    });
+  }
+
+  let frame=0;
+  const interval = setInterval(()=>{
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    pieces.forEach(p=>{
+      ctx.beginPath();
+      ctx.fillStyle = p.color;
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fill();
+      p.y += p.d;
+    });
+    frame++;
+    if(frame>100){
+      clearInterval(interval);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+  },16);
+}
+</script>
+</body>
+</html>
