@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ST Rita Chama Picker</title>
+<title>ST Jude Chama Picker</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
@@ -95,12 +95,21 @@ canvas{
   width:100%;
   height:100%;
 }
-.thank-you{
-  margin-top:20px;
-  font-size:16px;
-  color:#6B7445;
-  opacity:0.85;
-  word-wrap: break-word;
+#popup{
+  display:none;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  background:#BBCB2E;
+  color:#6CA651;
+  padding:25px 35px;
+  border-radius:20px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.3);
+  font-size:18px;
+  font-weight:600;
+  text-align:center;
+  z-index:1000;
 }
 
 /* Responsive */
@@ -108,14 +117,14 @@ canvas{
   h1{ font-size:20px; }
   .card{ font-size:16px; border-radius:20px; }
   button{ font-size:14px; padding:8px 16px; }
-  .thank-you{ font-size:14px; }
+  #popup{ font-size:16px; padding:20px 25px; }
   input{ font-size:14px; padding:8px; }
 }
 </style>
 </head>
 <body>
 
-<h1> St Jude Chama</h1>
+<h1>🌸 ST Jude Chama 🌸</h1>
 <div class="info">Enter your name before picking a card</div>
 
 <div class="form-container" id="formContainer">
@@ -123,13 +132,15 @@ canvas{
   <button id="startBtn">Start Picking</button>
 </div>
 
-<!-- Reset button container (hidden for non-admins) -->
+<!-- Admin-only Reset button -->
 <div id="resetContainer" style="display:none;">
   <button id="resetBtn">Reset All Cards</button>
 </div>
 
 <div class="grid" id="grid" style="display:none;"></div>
-<div class="thank-you" id="thankYou"></div>
+
+<!-- Pop-up card -->
+<div id="popup"></div>
 
 <canvas id="confetti"></canvas>
 
@@ -153,12 +164,12 @@ let TOTAL = 18;
 let userName = '';
 let hasPicked = false;
 const grid = document.getElementById('grid');
-const thankYou = document.getElementById('thankYou');
 const formContainer = document.getElementById('formContainer');
 const nameInput = document.getElementById('nameInput');
 const startBtn = document.getElementById('startBtn');
 const resetBtn = document.getElementById('resetBtn');
 const resetContainer = document.getElementById('resetContainer');
+const popup = document.getElementById('popup');
 
 startBtn.onclick = ()=>{
   const name = nameInput.value.trim();
@@ -167,7 +178,7 @@ startBtn.onclick = ()=>{
   formContainer.style.display = 'none';
   grid.style.display = 'grid';
 
-  // Show reset button only for Mary Wanjiku
+  // Admin only reset
   if(userName.toLowerCase() === 'mary wanjiku'){
     resetContainer.style.display = 'block';
   } else {
@@ -183,7 +194,7 @@ function checkUserPick(){
     const data = snapshot.val() || {};
     hasPicked = Object.values(data).some(p=>p.name.toLowerCase() === userName.toLowerCase());
     if(hasPicked){
-      thankYou.innerText = `Hello ${userName}, you have already picked a card.`;
+      showPopup(userName, Object.values(data).find(p=>p.name.toLowerCase()===userName.toLowerCase()).position);
     }
   });
 }
@@ -233,26 +244,24 @@ function pickCard(i, card){
     hasPicked = true;
     card.classList.add('revealed');
     card.innerText = `Position\n${pos}\n(${userName})`;
-    thankYou.innerText = `Thank you, ${userName}, for picking a card!`;
+    showPopup(userName, pos);
     launchConfetti();
   });
 }
 
-// Reset logic (only visible to Mary Wanjiku)
+// Admin reset
 resetBtn.onclick = ()=>{
   if(confirm("Are you sure you want to reset all picks? This cannot be undone.")){
     db.ref('picks').remove().then(()=>{
       hasPicked = false;
-      thankYou.innerText = '';
       render();
     }).catch(err=>{ alert("Error resetting: "+err.message); });
   }
-};
+}
 
 /* Top-falling Confetti */
 const canvas = document.getElementById('confetti');
 const ctx = canvas.getContext('2d');
-
 function launchConfetti(){
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -282,6 +291,42 @@ function launchConfetti(){
     if(frame>100){
       clearInterval(interval);
       ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+  },16);
+}
+
+/* Popup Thank You */
+function showPopup(name, position){
+  popup.innerHTML = `🎉 Thank you, ${name}! 🎉<br>You picked position ${position}`;
+  popup.style.display = 'block';
+  popup.style.opacity = '0';
+  popup.style.transform = 'translate(-50%, -60%)';
+
+  let opacity = 0;
+  let top = -60;
+  const fadeIn = setInterval(()=>{
+    opacity += 0.05;
+    top += 0.8;
+    popup.style.opacity = opacity;
+    popup.style.transform = `translate(-50%, ${top}%)`;
+    if(opacity >=1){
+      clearInterval(fadeIn);
+      setTimeout(()=>fadeOutPopup(), 3000);
+    }
+  },16);
+}
+
+function fadeOutPopup(){
+  let opacity = 1;
+  let top = 0;
+  const fadeOut = setInterval(()=>{
+    opacity -= 0.05;
+    top -= 0.8;
+    popup.style.opacity = opacity;
+    popup.style.transform = `translate(-50%, ${top}%)`;
+    if(opacity <=0){
+      clearInterval(fadeOut);
+      popup.style.display = 'none';
     }
   },16);
 }
